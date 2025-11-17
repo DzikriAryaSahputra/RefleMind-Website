@@ -5,7 +5,8 @@ import {
     initMoodTracker,
     renderMoodChart,
     loadJurnalRefleksi,
-    initRuangTenang
+    initRuangTenang,
+    loadFavoritQuotes
 } from './features.js';
 
 
@@ -48,15 +49,21 @@ function runApp(user) {
             try { loadJurnalRefleksi(user); } catch (e) { console.error("Gagal memuat jurnal:", e); }
         } else if (pageId === 'ruang-tenang') {
             try { initRuangTenang(user); } catch (e) { console.error("Gagal memuat Ruang Tenang:", e); }
+        } else if (pageId === 'favorit') { // <-- BLOK BARU
+            try { loadFavoritQuotes(user); } catch (e) { console.error("Gagal memuat favorit:", e); }
         }
     }
 
     document.addEventListener('click', (e) => {
-        const link = e.target.closest('#app-container a.nav-item');
-        if (link && link.getAttribute('href') && link.getAttribute('href').startsWith('#')) {
+        const link = e.target.closest('#app-container a[href^="#"]');
+
+        if (link) {
             e.preventDefault();
             const pageId = link.getAttribute('href').substring(1);
-            showPage(pageId);
+
+            if (document.getElementById(`page-${pageId}`)) {
+                showPage(pageId);
+            }
         }
     });
     showPage('home');
@@ -80,5 +87,43 @@ function runApp(user) {
             signOut(auth).catch((error) => console.error("Logout error:", error));
         });
     }
+    const appContainer = document.getElementById('app-container');
+    if (appContainer) {
+        appContainer.addEventListener('click', async (e) => {
+            const loveBtn = e.target.closest('.btn-love');
+            if (loveBtn) {
+                const card = e.target.closest('.card-quote');
+                const quoteId = card.getAttribute('data-quote-id');
+                if (!quoteId) return;
 
+                const quoteRef = doc(db, 'users', user.uid, 'loved_quotes', quoteId);
+                const icon = loveBtn.querySelector('i');
+                const isLoved = loveBtn.classList.toggle('loved');
+
+                if (isLoved) {
+                    icon.classList.remove('bi-heart');
+                    icon.classList.add('bi-heart-fill');
+                    try {
+                        await setDoc(quoteRef, { lovedAt: new Date() });
+                    } catch (err) {
+                        console.error("Gagal menyimpan love:", err);
+                        loveBtn.classList.remove('loved');
+                        icon.classList.add('bi-heart');
+                        icon.classList.remove('bi-heart-fill');
+                    }
+                } else {
+                    icon.classList.remove('bi-heart-fill');
+                    icon.classList.add('bi-heart');
+                    try {
+                        await deleteDoc(quoteRef);
+                    } catch (err) {
+                        console.error("Gagal menghapus love:", err);
+                        loveBtn.classList.add('loved');
+                        icon.classList.add('bi-heart-fill');
+                        icon.classList.remove('bi-heart');
+                    }
+                }
+            }
+        });
+    }
 }

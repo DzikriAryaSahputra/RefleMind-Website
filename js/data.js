@@ -35,3 +35,5 @@ export const HOME_QUOTES = [
     "Perasaanmu valid. Akui dan terima.",
     "Kebaikan kecil membuat perbedaan besar."
 ];
+
+export const QUOTE_MAP = new Map(ALL_QUOTES.map(quote => [quote.id, quote]));

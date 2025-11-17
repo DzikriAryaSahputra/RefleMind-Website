@@ -11,7 +11,7 @@ import {
     deleteDoc
 } from "https://www.gstatic.com/firebasejs/9.22.1/firebase-firestore.js";
 
-import { ALL_QUOTES, HOME_QUOTES } from './data.js';
+import { ALL_QUOTES, HOME_QUOTES, QUOTE_MAP } from './data.js';
 import { showNotification, getMoodIcon, formatTanggal } from './ui.js';
 
 /**
@@ -176,6 +176,84 @@ export async function loadJurnalRefleksi(user) {
         container.innerHTML = '<p class="text-center text-danger">Gagal memuat jurnal. Coba lagi nanti.</p>';
     }
 }
+function createQuoteCardHtml(quote) {
+    if (!quote) return '';
+
+    return `
+        <div class="card card-quote mb-3" data-quote-id="${quote.id}">
+            <div class="card-body">
+                <button class="btn btn-love"><i class="bi bi-heart"></i></button>
+                <h5 class="card-title">${quote.title}</h5>
+                <blockquote class="blockquote mb-0">
+                    <p>${quote.text}</p>
+                    ${quote.emoji ? `<footer>${quote.emoji}</footer>` : ''}
+                </blockquote>
+            </div>
+        </div>
+    `;
+}
+async function loadLovedQuotesStatus(user) {
+    try {
+        const lovedQuotesCol = collection(db, 'users', user.uid, 'loved_quotes');
+        const querySnapshot = await getDocs(lovedQuotesCol);
+        const lovedIds = new Set();
+        querySnapshot.forEach((doc) => lovedIds.add(doc.id));
+
+        const allQuoteCards = document.querySelectorAll('.card-quote');
+
+        allQuoteCards.forEach(card => {
+            const quoteId = card.getAttribute('data-quote-id');
+            const loveBtn = card.querySelector('.btn-love');
+            if (!loveBtn) return;
+
+            const icon = loveBtn.querySelector('i');
+            if (lovedIds.has(quoteId)) {
+                loveBtn.classList.add('loved');
+                icon.classList.remove('bi-heart');
+                icon.classList.add('bi-heart-fill');
+            } else {
+                loveBtn.classList.remove('loved');
+                icon.classList.remove('bi-heart-fill');
+                icon.classList.add('bi-heart');
+            }
+        });
+    } catch (e) {
+        console.error("Gagal memuat status 'loved quotes':", e);
+    }
+}
+export async function loadFavoritQuotes(user) {
+    const container = document.getElementById('favorit-list-container');
+    if (!container) return;
+    container.innerHTML = '<p class="text-center text-muted">Memuat favorit...</p>';
+
+    try {
+        const lovedQuotesCol = collection(db, 'users', user.uid, 'loved_quotes');
+        const querySnapshot = await getDocs(lovedQuotesCol);
+
+        if (querySnapshot.empty) {
+            container.innerHTML = '<p class="text-center text-muted">Kamu belum punya kutipan favorit. Mulai sukai kutipan di Ruang Tenang!</p>';
+            return;
+        }
+
+        container.innerHTML = '';
+
+        querySnapshot.forEach(doc => {
+            const quoteId = doc.id;
+            const quoteData = QUOTE_MAP.get(quoteId);
+
+            if (quoteData) {
+                const cardHtml = createQuoteCardHtml(quoteData);
+                container.insertAdjacentHTML('beforeend', cardHtml);
+            }
+        });
+
+        await loadLovedQuotesStatus(user);
+
+    } catch (e) {
+        console.error("Gagal memuat favorit:", e);
+        container.innerHTML = '<p class="text-center text-danger">Gagal memuat kutipan favorit.</p>';
+    }
+}
 
 export function initRuangTenang(user) {
     const pageRuangTenang = document.getElementById('page-ruang-tenang');
@@ -261,29 +339,4 @@ async function loadDailyQuotes() {
     displayDailyQuotes(quotes);
 }
 
-async function loadLovedQuotes(user) {
-    try {
-        const lovedQuotesCol = collection(db, 'users', user.uid, 'loved_quotes');
-        const querySnapshot = await getDocs(lovedQuotesCol);
-        const lovedIds = new Set();
-        querySnapshot.forEach((doc) => lovedIds.add(doc.id));
-        const allQuoteCards = document.querySelectorAll('#page-ruang-tenang .card-quote');
-        allQuoteCards.forEach(card => {
-            const quoteId = card.getAttribute('data-quote-id');
-            const loveBtn = card.querySelector('.btn-love');
-            if (!loveBtn) return;
-            const icon = loveBtn.querySelector('i');
-            if (lovedIds.has(quoteId)) {
-                loveBtn.classList.add('loved');
-                icon.classList.remove('bi-heart');
-                icon.classList.add('bi-heart-fill');
-            } else {
-                loveBtn.classList.remove('loved');
-                icon.classList.remove('bi-heart-fill');
-                icon.classList.add('bi-heart');
-            }
-        });
-    } catch (e) {
-        console.error("Gagal memuat 'loved quotes':", e);
-    }
-}
+
