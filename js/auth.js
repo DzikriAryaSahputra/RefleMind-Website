@@ -1,12 +1,16 @@
-import { auth } from './firebase-config.js';
+import { auth, db } from './firebase-config.js';
 import {
     signInWithEmailAndPassword,
     createUserWithEmailAndPassword,
     updateProfile
 } from "https://www.gstatic.com/firebasejs/9.22.1/firebase-auth.js";
+import { doc, setDoc } from "https://www.gstatic.com/firebasejs/9.22.1/firebase-firestore.js";
 
+// Ambil elemen dari halaman
 const loginForm = document.getElementById('login-form');
 const registerForm = document.getElementById('register-form');
+
+// --- ELEMEN TOAST ---
 const toast = document.getElementById('toast-notification');
 const toastIcon = document.getElementById('toast-icon');
 const toastMessage = document.getElementById('toast-message');
@@ -18,7 +22,6 @@ function showNotification(message, type = 'error') {
     clearTimeout(toastTimeout);
     toast.classList.remove('success', 'error');
     toast.classList.add(type);
-
     if (type === 'success') {
         toastIcon.innerHTML = '<i class="bi bi-check-circle-fill"></i>';
     } else {
@@ -31,7 +34,7 @@ function showNotification(message, type = 'error') {
     }, 4000);
 }
 
-// --- FUNGSI ERROR  ---
+// --- FUNGSI ERROR ---
 function showAuthError(message) {
     if (message.includes("auth/invalid-login-credentials") || message.includes("auth/wrong-password") || message.includes("auth/user-not-found")) {
         message = "Email atau password salah.";
@@ -78,14 +81,25 @@ if (registerForm) {
             showAuthError("Username tidak boleh kosong.");
             return;
         }
+
         createUserWithEmailAndPassword(auth, email, password)
-            .then((userCredential) => {
-                return updateProfile(userCredential.user, {
+            .then(async (userCredential) => {
+                const user = userCredential.user;
+                await updateProfile(user, {
                     displayName: username
                 });
+
+                await setDoc(doc(db, "users_list", user.uid), {
+                    username: username,
+                    email: email,
+                    role: 'user', // Default role
+                    joinedAt: new Date().toISOString()
+                });
+
+                return user;
             })
             .then(() => {
-                console.log("Register successful, redirecting...");
+                console.log("Register successful, data saved to DB.");
                 showNotification('Akun berhasil dibuat. Selamat datang!', 'success');
                 setTimeout(() => {
                     window.location.href = '../index.html';
